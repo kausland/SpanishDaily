@@ -156,6 +156,31 @@ nav button.on{color:var(--accent)}
 .confetti{color:var(--accent)}
 a{color:var(--teal)}
 .danger-link{color:var(--red);background:none;font-size:.85rem;font-weight:700;margin-top:8px}
+/* glossary */
+.gl-search{
+  width:100%;padding:13px 15px;border-radius:13px;border:1px solid var(--line);
+  background:var(--card);color:var(--text);font-size:1rem;font-family:inherit;margin-bottom:12px;
+}
+.gl-search:focus{outline:none;border-color:var(--accent)}
+.gl-cat{background:var(--card);border:1px solid var(--line);border-radius:15px;margin-bottom:9px;overflow:hidden}
+.gl-head{
+  width:100%;display:flex;justify-content:space-between;align-items:center;
+  background:none;color:var(--text);padding:13px 15px;text-align:left;
+}
+.gl-head small{display:block;color:var(--muted);font-size:.74rem;margin-top:2px;font-weight:600}
+.gl-head b{font-size:.95rem}
+.gl-arrow{color:var(--muted);font-size:.9rem}
+.gl-words{border-top:1px solid var(--line)}
+.gl-row{display:flex;align-items:flex-start;gap:10px;padding:10px 15px;border-bottom:1px solid #20242e;cursor:pointer}
+.gl-row:last-child{border-bottom:none}
+.gl-dot{width:8px;height:8px;border-radius:99px;flex-shrink:0;margin-top:7px}
+.gl-txt{flex:1}
+.gl-txt b{font-size:.94rem;display:block}
+.gl-txt small{color:var(--muted);font-size:.8rem}
+.gl-detail{display:none;font-size:.8rem;color:var(--muted);margin-top:6px;line-height:1.5}
+.gl-detail i{color:var(--teal);font-style:normal}
+.gl-detail.show{display:block}
+.gl-speak{background:none;font-size:1rem;padding:4px;color:var(--teal)}
 </style>
 </head>
 <body>
@@ -331,9 +356,10 @@ function greeting(){
 /* ============ CARDS ============ */
 let fc={mode:null,queue:[],i:0,flipped:false};
 function renderCards(mode){
-  if(mode==='learn')startLearn();
-  else if(mode==='review')startReview();
-  else if(!fc.mode||fc.i>=fc.queue.length){
+  if(mode==='learn'){startLearn();return}
+  if(mode==='review'){startReview();return}
+  if(mode==='glossary'){renderCardsGlossary();return}
+  if(!fc.mode||fc.i>=fc.queue.length){
     const due=dueCards().length;
     $('main').innerHTML=`
     <h2>Tarjetas</h2><div class="sub">Repetición espaciada — repasa justo antes de olvidar</div>
@@ -346,10 +372,69 @@ function renderCards(mode){
       <div class="tag teal">Repaso</div>
       <p style="font-size:.92rem;color:var(--muted);margin-bottom:12px">${due>0?due+' tarjeta'+(due===1?'':'s')+' lista'+(due===1?'':'s')+' para repasar.':'Nada pendiente por ahora. Vuelve mañana.'}</p>
       <button class="btn teal" ${due?'':'disabled'} onclick="go('cards','review')">Repasar ahora</button>
+    </div>
+    <div class="card">
+      <div class="tag purple">Glosario</div>
+      <p style="font-size:.92rem;color:var(--muted);margin-bottom:12px">Las ${CURRICULUM.reduce((a,d)=>a+d.vocab.length,0)} palabras del curso, organizadas por categoría, con búsqueda y audio.</p>
+      <button class="btn ghost" onclick="go('cards','glossary')">Ver glosario completo</button>
     </div>`;
     return;
   }
   drawCard();
+}
+/* ============ GLOSSARY ============ */
+let gl={q:'',open:{}};
+function renderCardsGlossary(){
+  const studied=new Set();
+  const max=Math.min(S.maxDay,CURRICULUM.length);
+  for(let n=1;n<=max;n++){if(S.done[n]&&S.done[n].v)studied.add(n)}
+  const q=gl.q.trim().toLowerCase();
+  let total=0,shown=0,html='';
+  CURRICULUM.forEach(d=>{
+    total+=d.vocab.length;
+    const matches=q?d.vocab.map((v,i)=>[v,i]).filter(([v])=>
+      v.es.toLowerCase().includes(q)||v.en.toLowerCase().includes(q)):d.vocab.map((v,i)=>[v,i]);
+    if(!matches.length)return;
+    shown+=matches.length;
+    const isOpen=q?true:!!gl.open[d.day];
+    const lock=d.day>max?' 🔒':'';
+    html+=`<div class="gl-cat">
+      <button class="gl-head" onclick="glToggle(${d.day})">
+        <span><b>${esc(d.theme)}</b><small>Día ${d.day}${lock} · ${d.vocab.length} palabras</small></span>
+        <span class="gl-arrow">${isOpen?'▾':'▸'}</span>
+      </button>
+      ${isOpen?`<div class="gl-words">${matches.map(([v,i])=>{
+        const st=srsOf(cardId(d.day,i));
+        const dot=!studied.has(d.day)||st.reps===0?'var(--line)':st.intv<21?'var(--accent)':'var(--green)';
+        const rid='w'+d.day+'-'+i;
+        return `<div class="gl-row" onclick="glDetail('${rid}')">
+          <span class="gl-dot" style="background:${dot}"></span>
+          <div class="gl-txt"><b>${esc(v.es)}</b><small>${esc(v.en)}</small>
+            <div class="gl-detail" id="${rid}"><i>${esc(v.ex)}</i><br>${esc(v.exEn)}</div>
+          </div>
+          <button class="gl-speak" onclick="event.stopPropagation();speak('${v.es.replace(/'/g,"\\'")}')">🔊</button>
+        </div>`}).join('')}</div>`:''}
+    </div>`;
+  });
+  $('main').innerHTML=`
+  <h2>Glosario</h2><div class="sub">${q?shown+' resultado'+(shown===1?'':'s'):total+' palabras · '+CURRICULUM.length+' categorías'}</div>
+  <input class="gl-search" id="glq" type="search" placeholder="Buscar en español o inglés..." value="${esc(gl.q)}"
+    oninput="gl.q=this.value;glRefresh()">
+  <div style="display:flex;gap:14px;font-size:.75rem;color:var(--muted);margin-bottom:12px;flex-wrap:wrap">
+    <span><i class="gl-dot" style="background:var(--line);display:inline-block"></i> Nueva</span>
+    <span><i class="gl-dot" style="background:var(--accent);display:inline-block"></i> Aprendiendo</span>
+    <span><i class="gl-dot" style="background:var(--green);display:inline-block"></i> Dominada</span>
+  </div>
+  <div id="gl-list">${html||'<div class="empty-state">Sin resultados para «'+esc(gl.q)+'»</div>'}</div>
+  <button class="btn ghost" style="margin-top:10px" onclick="go('cards')">← Volver a tarjetas</button>`;
+}
+function glToggle(day){gl.open[day]=!gl.open[day];glRefresh(true)}
+function glDetail(id){const el=$(id);if(el)el.classList.toggle('show')}
+function glRefresh(keepFocusLost){
+  const pos=$('glq')?$('glq').selectionStart:0;
+  renderCardsGlossary();
+  if(!keepFocusLost){const inp=$('glq');if(inp){inp.focus();inp.setSelectionRange(pos,pos)}}
+  else window.scrollTo(0,window.scrollY);
 }
 function startLearn(){
   const n=curDay(),d=dayData(n);
