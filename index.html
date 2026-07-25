@@ -287,7 +287,7 @@ const TABS=[
  {id:'home',label:'Hoy',icon:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'},
  {id:'cards',label:'Tarjetas',icon:'<rect x="3" y="5" width="14" height="16" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v14"/>'},
  {id:'grammar',label:'Gramática',icon:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'},
- {id:'listen',label:'Escucha',icon:'<polygon points="6 3 20 12 6 21 6 3"/>'},
+ {id:'listen',label:'Medios',icon:'<polygon points="6 3 20 12 6 21 6 3"/>'},
  {id:'drill',label:'Práctica',icon:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>'},
  {id:'stats',label:'Progreso',icon:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>'},
 ];
@@ -572,13 +572,21 @@ function answer(i){
    <button class="btn" style="margin-top:12px" onclick="gq.i++;gq.answered=false;drawQuiz()">${gq.i===dayData(gq.day).grammar.exercises.length-1?"Ver resultado":"Siguiente →"}</button>`;
 }
 /* ============ LISTEN ============ */
-function renderListen(){
+function mediaToggle(cur){
+  return `<div class="picker" style="margin-bottom:14px">
+    <button class="${cur==='listen'?'on':''}" onclick="go('listen')">🎧 Escucha</button>
+    <button class="${cur==='read'?'on':''}" onclick="go('listen','read')">📖 Lectura</button>
+  </div>`;
+}
+function renderListen(mode){
+  if(mode==='read'){renderReadingList();return}
   const n=curDay(),d=dayData(n),st=S.done[n]||{};
   const max=Math.min(S.maxDay,CURRICULUM.length);
   const archive=[];
   for(let k=max;k>=1;k--){if(k!==((n-1)%CURRICULUM.length)+1)archive.push(k)}
   $('main').innerHTML=`
-  <h2>Escucha</h2><div class="sub">Español mexicano real, todos los días</div>
+  <h2>Medios</h2><div class="sub">Español mexicano real, todos los días</div>
+  ${mediaToggle('listen')}
   <div class="media-card" style="border-color:var(--accent)">
     <div class="tag amber">Hoy · Día ${((n-1)%CURRICULUM.length)+1}</div>
     <h3>${esc(d.media.title)}</h3>
@@ -598,6 +606,72 @@ function renderListen(){
 function markListen(n){
   if(markPart(n,'l')){addXP(10);toast('✓ Escucha completada · +10 XP')}
   renderListen();
+}
+/* ============ READING ============ */
+let rd={open:null,showAll:false};
+function renderReadingList(){
+  if(!S.readDone)S.readDone={};
+  const lvl=['','Fácil','Intermedio','Avanzado'];
+  const lvlColor=['','var(--green)','var(--accent)','var(--red)'];
+  const doneCount=READINGS.filter(r=>S.readDone[r.id]).length;
+  $('main').innerHTML=`
+  <h2>Lectura</h2><div class="sub">${READINGS.length} textos sin conexión · ${doneCount} leído${doneCount===1?'':'s'}</div>
+  ${mediaToggle('read')}
+  ${READINGS.map(r=>`
+    <div class="media-card" onclick="openReading('${r.id}')" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div><h3>${esc(r.title)} ${S.readDone[r.id]?'<span style="color:var(--green)">✓</span>':''}</h3>
+        <p style="margin-bottom:6px">${esc(r.author)}</p></div>
+        <span class="tag" style="background:transparent;border:1px solid var(--line);color:${lvlColor[r.level]};flex-shrink:0">${lvl[r.level]}</span>
+      </div>
+      <div style="font-size:.75rem;color:var(--muted)">${esc(r.type)} · ${r.min} min de lectura</div>
+    </div>`).join('')}
+  <div class="sub" style="margin-top:22px">Fuentes en línea (requieren internet)</div>
+  ${READ_SOURCES.map(s=>`<div class="media-card"><h3>${esc(s.title)}</h3><p>${esc(s.desc)}</p>
+    <a class="btn ghost sm" style="text-decoration:none" href="${s.url}" target="_blank" rel="noopener">Abrir ↗</a></div>`).join('')}`;
+}
+function openReading(id){
+  rd={open:id,showAll:false};
+  drawReading();
+  window.scrollTo(0,0);
+}
+function drawReading(){
+  const r=READINGS.find(x=>x.id===rd.open);
+  if(!r){renderReadingList();return}
+  if(!S.readDone)S.readDone={};
+  const done=!!S.readDone[r.id];
+  $('main').innerHTML=`
+  <button class="btn ghost sm" onclick="go('listen','read')">← Lecturas</button>
+  <h2 style="margin-top:14px">${esc(r.title)}</h2>
+  <div class="sub">${esc(r.author)} · ${esc(r.type)} · ${r.min} min</div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn ghost sm" style="flex:1" onclick="rd.showAll=!rd.showAll;drawReading()">${rd.showAll?'Ocultar traducción':'Traducción completa'}</button>
+    <button class="btn ghost sm" style="flex:1" onclick="readAloud()">🔊 Escuchar</button>
+  </div>
+  <div class="sub" style="font-size:.75rem;margin-bottom:10px">Toca cualquier párrafo para ver su traducción.</div>
+  ${r.paras.map((p,i)=>`
+    <div class="card" style="padding:15px;cursor:pointer;margin-bottom:10px" onclick="toggleTrans(${i})">
+      <div style="font-size:.98rem;line-height:1.65">${esc(p[0])}</div>
+      <div class="gl-detail ${rd.showAll?'show':''}" id="tr${i}" style="margin-top:9px;font-size:.85rem">${esc(p[1])}</div>
+    </div>`).join('')}
+  <button class="btn ${done?'ghost':''}" onclick="finishReading('${r.id}')">${done?'✓ Leído':'Marcar como leído (+15 XP)'}</button>`;
+}
+function toggleTrans(i){const el=$('tr'+i);if(el)el.classList.toggle('show')}
+function readAloud(){
+  const r=READINGS.find(x=>x.id===rd.open); if(!r)return;
+  if(!('speechSynthesis' in window))return toast('Audio no disponible');
+  speechSynthesis.cancel();
+  const v=voices.find(x=>x.lang==='es-MX')||voices.find(x=>x.lang&&x.lang.startsWith('es'));
+  r.paras.forEach(p=>{
+    const u=new SpeechSynthesisUtterance(p[0]);
+    if(v)u.voice=v; u.lang=v?v.lang:'es-MX'; u.rate=.9;
+    speechSynthesis.speak(u);
+  });
+}
+function finishReading(id){
+  if(!S.readDone)S.readDone={};
+  if(!S.readDone[id]){S.readDone[id]=true;save();addXP(15);toast('✓ Lectura completada · +15 XP')}
+  drawReading();
 }
 /* ============ DRILL ============ */
 let dr={on:false,i:0,score:0,tense:'todos',q:null,answered:false};
