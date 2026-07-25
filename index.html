@@ -294,19 +294,19 @@ function renderHome(){
         <svg width="92" height="92"><circle cx="46" cy="46" r="40" stroke="#2a303c" stroke-width="8" fill="none"/>
         <circle cx="46" cy="46" r="40" stroke="var(--accent)" stroke-width="8" fill="none" stroke-linecap="round"
           stroke-dasharray="${circ}" stroke-dashoffset="${circ*(1-parts/3)}"/></svg>
-        <div class="num"><b>${pct}%</b><i>DÍA ${((n-1)%30)+1}</i></div>
+        <div class="num"><b>${pct}%</b><i>DÍA ${((n-1)%CURRICULUM.length)+1}</i></div>
       </div>
       <div>
         <div class="tag amber">${esc(d.theme)}${loop}</div>
         <div style="font-weight:800;font-size:1.05rem;line-height:1.35">${esc(d.grammar.title)}</div>
-        <div style="color:var(--muted);font-size:.85rem;margin-top:3px">12 palabras · 4 ejercicios · 1 video</div>
+        <div style="color:var(--muted);font-size:.85rem;margin-top:3px">${d.vocab.length} palabras · ${d.grammar.exercises.length} ejercicios · 1 video</div>
       </div>
     </div>
   </div>
   <div class="card">
     <div class="check-item ${st.v?'done':''}">
       <div class="ico" style="background:var(--accent-dim)">🃏</div>
-      <div class="txt"><b>Vocabulario</b><small>Estudia las 12 palabras de hoy</small></div>
+      <div class="txt"><b>Vocabulario</b><small>Estudia las ${dayData(curDay()).vocab.length} palabras de hoy</small></div>
       <button class="go" onclick="go('cards','learn')">${st.v?'✓ Listo':'Empezar'}</button>
     </div>
     <div class="check-item ${st.g?'done':''}">
@@ -339,7 +339,7 @@ function renderCards(mode){
     <h2>Tarjetas</h2><div class="sub">Repetición espaciada — repasa justo antes de olvidar</div>
     <div class="card">
       <div class="tag amber">Hoy</div>
-      <p style="font-size:.92rem;color:var(--muted);margin-bottom:12px">Las 12 palabras del día ${((curDay()-1)%30)+1}: <b style="color:var(--text)">${esc(dayData(curDay()).theme)}</b></p>
+      <p style="font-size:.92rem;color:var(--muted);margin-bottom:12px">Las ${dayData(curDay()).vocab.length} palabras del día ${((curDay()-1)%CURRICULUM.length)+1}: <b style="color:var(--text)">${esc(dayData(curDay()).theme)}</b></p>
       <button class="btn" onclick="go('cards','learn')">Estudiar palabras de hoy</button>
     </div>
     <div class="card">
@@ -415,7 +415,7 @@ function doGrade(g){
 function finishCards(){
   if(fc.mode==='learn'){
     markPart(fc.day,'v');
-    toast('✓ Vocabulario del día listo · +12 XP');
+    toast('✓ Vocabulario del día listo · +'+fc.queue.length+' XP');
   }else toast('✓ Repaso terminado');
   fc={mode:null,queue:[],i:0,flipped:false};
   go('home');
@@ -429,13 +429,13 @@ function renderGrammar(pick){
   let picker='';
   if(max>1){
     picker='<div class="picker">'+Array.from({length:max},(_,k)=>k+1).map(k=>
-     `<button class="${k===((n-1)%30)+1?'on':''}" onclick="go('grammar',${k})">Día ${k}</button>`).join('')+'</div>';
+     `<button class="${k===((n-1)%CURRICULUM.length)+1?'on':''}" onclick="go('grammar',${k})">Día ${k}</button>`).join('')+'</div>';
   }
   $('main').innerHTML=`
   <h2>Gramática</h2><div class="sub">Una regla al día, bien aprendida</div>
   ${picker}
   <div class="card">
-    <div class="tag teal">Regla del día ${((n-1)%30)+1}</div>
+    <div class="tag teal">Regla del día ${((n-1)%CURRICULUM.length)+1}</div>
     <h2 style="font-size:1.2rem;margin-bottom:10px">${esc(d.grammar.title)}</h2>
     <p class="gr-explain">${esc(d.grammar.explain)}</p>
   </div>
@@ -453,16 +453,16 @@ function startQuiz(n){gq={day:n,i:0,score:0,answered:false};drawQuiz()}
 function drawQuiz(){
   const d=dayData(gq.day),exs=d.grammar.exercises;
   if(gq.i>=exs.length){
-    const passed=gq.score>=3;
+    const passed=gq.score>=exs.length-1;
     markPart(gq.day,'g');
     addXP(gq.score*5);
     $('main').innerHTML=`
     <div class="empty-state">
       <div class="big">${passed?'🎯':'📚'}</div>
-      <h2>${gq.score}/4 correctas</h2>
+      <h2>${gq.score}/${exs.length} correctas</h2>
       <p style="margin:10px 0 20px">${passed?'¡Excelente! +'+(gq.score*5)+' XP':'+'+(gq.score*5)+' XP — repasa la regla y reinténtalo.'}</p>
       <div class="row">
-        <button class="btn ghost" onclick="go('grammar',${((gq.day-1)%30)+1})">Ver la regla</button>
+        <button class="btn ghost" onclick="go('grammar',${((gq.day-1)%CURRICULUM.length)+1})">Ver la regla</button>
         <button class="btn" onclick="go('home')">Continuar</button>
       </div>
     </div>`;
@@ -470,7 +470,7 @@ function drawQuiz(){
   }
   const e=exs[gq.i];
   $('main').innerHTML=`
-  <h2>Ejercicio ${gq.i+1}/4</h2>
+  <h2>Ejercicio ${gq.i+1}/${exs.length}</h2>
   <div class="sub">${esc(d.grammar.title)}</div>
   <div class="card"><div class="ex-es" style="font-size:1.15rem">${esc(e.q)}</div></div>
   <div id="opts">${e.options.map((o,i)=>`<button class="q-opt" onclick="answer(${i})">${esc(o)}</button>`).join('')}</div>
@@ -484,18 +484,18 @@ function answer(i){
   if(i===e.a){gq.score++;toast('✓ ¡Correcto!')}
   else btns[i].classList.add('wrong');
   $('fb').innerHTML=`<div class="hint-box">💡 ${esc(e.hint)}</div>
-   <button class="btn" style="margin-top:12px" onclick="gq.i++;gq.answered=false;drawQuiz()">${gq.i===3?'Ver resultado':'Siguiente →'}</button>`;
+   <button class="btn" style="margin-top:12px" onclick="gq.i++;gq.answered=false;drawQuiz()">${gq.i===dayData(gq.day).grammar.exercises.length-1?"Ver resultado":"Siguiente →"}</button>`;
 }
 /* ============ LISTEN ============ */
 function renderListen(){
   const n=curDay(),d=dayData(n),st=S.done[n]||{};
   const max=Math.min(S.maxDay,CURRICULUM.length);
   const archive=[];
-  for(let k=max;k>=1;k--){if(k!==((n-1)%30)+1)archive.push(k)}
+  for(let k=max;k>=1;k--){if(k!==((n-1)%CURRICULUM.length)+1)archive.push(k)}
   $('main').innerHTML=`
   <h2>Escucha</h2><div class="sub">Español mexicano real, todos los días</div>
   <div class="media-card" style="border-color:var(--accent)">
-    <div class="tag amber">Hoy · Día ${((n-1)%30)+1}</div>
+    <div class="tag amber">Hoy · Día ${((n-1)%CURRICULUM.length)+1}</div>
     <h3>${esc(d.media.title)}</h3>
     <p>${esc(d.media.desc)}</p>
     <div class="task-box">🎯 ${esc(d.media.task)}</div>
@@ -595,13 +595,13 @@ function renderStats(){
     days.push({label:d.toLocaleDateString('es-MX',{weekday:'narrow'}),xp:S.history[key]||0})}
   const maxXp=Math.max(...days.map(d=>d.xp),1);
   const doneCount=Object.keys(S.done).filter(k=>dayDone(+k)).length;
-  const curN=((curDay()-1)%30)+1;
+  const curN=((curDay()-1)%CURRICULUM.length)+1;
   $('main').innerHTML=`
   <h2>Progreso</h2><div class="sub">Tu camino hacia la fluidez</div>
   <div class="stat-grid">
     <div class="stat"><b>🔥 ${S.streak}</b><small>Racha (días)</small></div>
     <div class="stat"><b>⚡ ${S.xp}</b><small>XP total</small></div>
-    <div class="stat"><b>${doneCount}/30</b><small>Días completados</small></div>
+    <div class="stat"><b>${doneCount}/${CURRICULUM.length}</b><small>Días completados</small></div>
     <div class="stat"><b>${cards.length}</b><small>Palabras estudiadas</small></div>
   </div>
   <div class="card">
@@ -624,7 +624,7 @@ function renderStats(){
   </div>
   <div class="card">
     <div class="tag purple">Mapa del curso</div>
-    <div class="daydots">${Array.from({length:30},(_,k)=>{
+    <div class="daydots">${Array.from({length:CURRICULUM.length},(_,k)=>{
       const n=k+1;
       return `<div class="daydot ${dayDone(n)?'done':''} ${n===curN?'today':''}">${n}</div>`}).join('')}</div>
   </div>

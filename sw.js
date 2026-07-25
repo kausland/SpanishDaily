@@ -1,4 +1,4 @@
-const CACHE = 'espanol-diario-v1';
+const CACHE = 'espanol-diario-v2';
 const ASSETS = [
   './',
   './index.html',
